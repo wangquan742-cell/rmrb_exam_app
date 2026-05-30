@@ -73,3 +73,4 @@ APP_PASSWORD = "你自己的密码"
 DEPLOY_TO_PUBLIC_WEB.md
 PUBLIC_DEPLOY_CHECKLIST.md
 ```
+V7.1 redeploy trigger

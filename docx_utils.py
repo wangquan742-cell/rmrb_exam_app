@@ -101,6 +101,21 @@ def build_rule_based_article_analysis(row: dict) -> dict:
         "阅读方法：先判断背景段，再找问题意识，最后锁定对策和总结。"
     ]
 
+    cloze_items = [
+        "高频实词：推进、完善、优化、提升、夯实、统筹、赋能、落实。",
+        "规范搭配：系统推进、协同发力、精准施策、久久为功、闭环管理、源头治理、提质增效。",
+        "成语/四字格：因地制宜、久久为功、标本兼治、同向发力。请结合原文判断适用场景。",
+        "近义词辨析：推动/推进/促进，完善/健全/优化，提升/提高/增强，夯实/筑牢/巩固。",
+        "语境关系：标注并列、递进、转折、因果、解释说明、让步补充等关系。",
+        "仿真逻辑填空题：请 ChatGPT 基于原文生成2—3道题。",
+        "错项解析：逐项说明搭配不当、程度不符、感情色彩不符、对象不匹配、语义重复或逻辑不一致。",
+        "今日必背搭配：从原文和人民日报规范表达中提炼。"
+    ]
+
+    rule_cloze = row.get("逻辑填空积累", "")
+    if rule_cloze:
+        cloze_items.insert(0, f"规则版提示：{rule_cloze}")
+
     return {
         "原文导读": intro,
         "结构拆解": structure,
@@ -108,6 +123,7 @@ def build_rule_based_article_analysis(row: dict) -> dict:
         "面试积累": interview_items,
         "机关思维": f"本文适合训练：{thinking}。复习时要把新闻材料转化为工作语言，关注群众需求、责任落实、协同治理和闭环整改。",
         "行测言语": xingce_items,
+        "逻辑填空积累": cloze_items,
         "中英表达": bilingual,
         "背诵金句": [
             "坚持问题导向，聚焦群众急难愁盼，推动工作从“有没有”向“好不好”转变。",
@@ -184,21 +200,25 @@ def create_article_docx(row: dict, deepseek_analysis: str = "", openai_analysis:
     add_heading(doc, "八、行测言语理解积累", 1)
     add_bullets(doc, analysis["行测言语"])
 
-    add_heading(doc, "九、中英表达积累", 1)
+    add_heading(doc, "九、逻辑填空积累", 1)
+    add_bullets(doc, analysis["逻辑填空积累"])
+    add_body_paragraph(doc, "逻辑填空积累提示区：请用 ChatGPT 结合原文补充高频实词、规范搭配、成语/四字格、近义词辨析、语境关系、仿真题、正确答案、错项解析和今日必背搭配。")
+
+    add_heading(doc, "十、中英表达积累", 1)
     add_body_paragraph(doc, analysis["中英表达"])
 
-    add_heading(doc, "十、今日背诵金句", 1)
+    add_heading(doc, "十一、今日背诵金句", 1)
     add_bullets(doc, analysis["背诵金句"])
 
     if openai_analysis:
-        add_heading(doc, "十一、ChatGPT/OpenAI API 深度解析结果", 1)
+        add_heading(doc, "十二、ChatGPT 手动深度解析结果", 1)
         add_body_paragraph(doc, openai_analysis)
 
     if deepseek_analysis:
-        add_heading(doc, "十二、DeepSeek API 深度解析结果", 1)
+        add_heading(doc, "十三、外部手动深度解析结果", 1)
         add_body_paragraph(doc, deepseek_analysis)
 
-    add_heading(doc, "十三、个人复盘区", 1)
+    add_heading(doc, "十四、个人复盘区", 1)
     add_bullets(doc, analysis["个人复盘"])
     doc.add_paragraph("\n我的补充笔记：\n\n\n")
 
@@ -241,6 +261,9 @@ def create_combined_docx(df: pd.DataFrame, task_code: str, top_n: int = 10) -> b
 
             add_heading(doc, "5. 行测言语理解积累", 2)
             add_bullets(doc, analysis["行测言语"])
+
+            add_heading(doc, "6. 逻辑填空积累", 2)
+            add_bullets(doc, analysis["逻辑填空积累"])
 
     bio = BytesIO()
     doc.save(bio)

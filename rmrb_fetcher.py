@@ -403,6 +403,31 @@ def generate_bilingual_terms(tags: str) -> str:
     return "；".join(terms)
 
 
+def generate_cloze_accumulation(tags: str, title: str = "") -> str:
+    base = [
+        "高频实词：推进、完善、优化、提升、夯实、统筹、赋能、落实",
+        "规范搭配：系统推进、协同发力、精准施策、久久为功、闭环管理、源头治理、提质增效",
+        "成语/四字格：因地制宜、久久为功、标本兼治、同向发力",
+        "近义词辨析：推动偏宏观启动，推进偏过程落实，促进偏形成积极变化；完善偏补短板，健全偏建机制，优化偏提质量",
+        "语境关系：重点关注并列、递进、转折、因果、解释说明、让步补充",
+        "仿真逻辑填空题：请ChatGPT结合原文生成2—3道题，并给出正确答案与错项解析",
+        "今日必背搭配：精准施策、协同治理、提质增效、闭环落实",
+    ]
+
+    if "基层治理" in tags:
+        base.append("主题搭配：党建引领基层治理、资源下沉、群众参与、闭环落实")
+    if "高质量发展" in tags or "新质生产力" in tags:
+        base.append("主题搭配：创新驱动、数字赋能、产业升级、提质增效")
+    if "民生服务" in tags:
+        base.append("主题搭配：精准供给、兜底保障、回应关切、优化服务")
+    if "法治政府" in tags:
+        base.append("主题搭配：依法行政、规范执法、权责清晰、源头治理")
+    if "营商环境" in tags:
+        base.append("主题搭配：简政放权、公平监管、优化服务、激发活力")
+
+    return "；".join(base)
+
+
 def generate_daily_review(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
@@ -468,9 +493,10 @@ def articles_to_dataframe(articles: List[Article]) -> pd.DataFrame:
             "申论积累方向": generate_shenlun_direction(tags),
             "面试题雏形": generate_interview_question(item.title, tags, interview_types),
             "中英表达积累": generate_bilingual_terms(tags),
+            "逻辑填空积累": generate_cloze_accumulation(tags, item.title),
             "复习状态": "未复习",
             "个人笔记": "",
-            "备注": "V3.1：强化筛选、复盘、多sheet与Excel美化"
+            "备注": "V6.2：手机体验 + 逻辑填空积累版"
         })
 
     df = pd.DataFrame(rows)
@@ -484,7 +510,7 @@ def articles_to_dataframe(articles: List[Article]) -> pd.DataFrame:
 def make_study_sheets(df: pd.DataFrame):
     if df.empty:
         empty = pd.DataFrame()
-        return empty, empty, empty, empty
+        return empty, empty, empty, empty, empty, empty
 
     top_df = df.sort_values(by="考公价值分", ascending=False).head(10)
 
@@ -505,6 +531,11 @@ def make_study_sheets(df: pd.DataFrame):
     ]
     bilingual_df = df[[col for col in bilingual_cols if col in df.columns]].copy()
 
+    cloze_cols = [
+        "日期", "标题", "主题标签", "逻辑填空积累", "正文预览", "链接"
+    ]
+    cloze_df = df[[col for col in cloze_cols if col in df.columns]].copy()
+
     review_df = generate_daily_review(df)
 
-    return top_df, shenlun_df, interview_df, bilingual_df, review_df
+    return top_df, shenlun_df, interview_df, bilingual_df, cloze_df, review_df

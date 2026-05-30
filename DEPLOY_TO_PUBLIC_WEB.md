@@ -1,4 +1,4 @@
-# V6.1 部署成公网网址完整说明
+# V6.2 部署成公网网址完整说明
 
 ## 一、推荐方案：Streamlit Community Cloud
 

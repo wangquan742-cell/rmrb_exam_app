@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from ai_utils import (
+    CHATGPT_COPY_INSTRUCTION,
     build_chatgpt_markdown_package,
     build_chatgpt_package,
     build_prompt_first_sheet,
@@ -18,7 +19,7 @@ from rmrb_fetcher import articles_to_dataframe, fetch_multiple_pages, make_study
 
 def get_app_password():
     """
-    V6.1 可选访问密码：
+    V6.2 可选访问密码：
     1. Streamlit Cloud：在 Secrets 里配置 APP_PASSWORD
     2. 本地运行：可设置环境变量 APP_PASSWORD
     3. 如果都没配置，则默认不启用密码
@@ -102,7 +103,7 @@ def ensure_content_column(df: pd.DataFrame, articles):
 
 
 st.set_page_config(
-    page_title="人民日报考公学习助手 V6",
+    page_title="人民日报考公学习助手 V6.2",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -129,6 +130,12 @@ st.markdown(
         .stButton button {
             width: 100%;
         }
+        .stDownloadButton button {
+            width: 100%;
+            min-height: 3rem;
+            font-size: 1rem;
+            font-weight: 650;
+        }
         div[data-testid="stMetricValue"] {
             font-size: 1.1rem;
         }
@@ -140,8 +147,24 @@ st.markdown(
 
 require_password()
 
-st.title("📰 人民日报考公考编学习助手 V6.1")
-st.caption("公网部署增强版：纯 ChatGPT 半自动、可设置访问密码、手机端适配、生成可上传给 ChatGPT App 的精品学习包。")
+st.title("📰 人民日报考公考编学习助手 V6.2")
+st.caption("手机体验 + 逻辑填空积累版：纯 ChatGPT 半自动、不接任何 AI API、不需要 API Key。")
+
+st.markdown("### 今日使用流程")
+flow_cols = st.columns(3)
+flow_cols[0].markdown("**1. 选择日期和版面**  \n在侧边栏设置日期、版面范围和正文抓取。")
+flow_cols[1].markdown("**2. 点击开始抓取**  \n系统自动筛选每日精品 Top10。")
+flow_cols[2].markdown("**3. 下载精品 Markdown 分析包**  \n手机端优先下载 Markdown。")
+flow_cols = st.columns(3)
+flow_cols[0].markdown("**4. 上传到 ChatGPT App**  \n把 Markdown 文件发给 ChatGPT。")
+flow_cols[1].markdown("**5. 对 ChatGPT 说“按分析包执行”**  \n或复制页面里的完整指令。")
+flow_cols[2].markdown("**6. 生成 Word 并打包 zip**  \nChatGPT 解析后按文章分别返回 Word。")
+
+st.info("手机端提示：推荐手机端优先下载 Markdown 分析包；Excel 和 Word 更适合电脑端使用。如果今天抓不到，可能当天还未更新，建议选择昨天日期。")
+
+st.markdown("### 复制给 ChatGPT 的指令")
+st.text_area("上传 Markdown 分析包后，复制这段话给 ChatGPT", value=CHATGPT_COPY_INSTRUCTION, height=150)
+st.code(CHATGPT_COPY_INSTRUCTION, language="text")
 
 if "df" not in st.session_state:
     st.session_state.df = None
@@ -154,6 +177,12 @@ if "task_code" not in st.session_state:
 
 with st.sidebar:
     st.header("抓取设置")
+
+    usage_mode = st.radio(
+        "使用模式",
+        ["手机快速模式", "电脑完整模式"],
+        help="手机快速模式突出 Markdown 下载；电脑完整模式显示完整表格和 Excel/Word/Markdown 下载。"
+    )
 
     selected_date = st.date_input("选择日期", value=date.today())
 
@@ -195,7 +224,7 @@ with st.sidebar:
 
     st.divider()
     st.header("手机/公网")
-    st.caption("V6.1 可部署到 Streamlit Community Cloud，生成公网网址后 iPhone Safari 可以直接打开。")
+    st.caption("V6.2 可部署到 Streamlit Community Cloud，生成公网网址后 iPhone Safari 可以直接打开。")
     st.caption("本地同 Wi‑Fi 也可用 Mac 局域网 IP 访问。部署步骤见压缩包内 DEPLOY_TO_PUBLIC_WEB.md。")
 
 date_str = selected_date.strftime("%Y-%m-%d")
@@ -221,6 +250,8 @@ if include_content:
     st.warning(f"本次会继续抓取候选文章正文，最多抓取 {max_content_articles} 篇；最终只保留Top {max_best_articles}。")
 else:
     st.info("当前只抓取文章标题和链接，不抓取正文。")
+
+st.caption("提示：如果今天抓不到，可能人民日报电子版当天尚未更新，建议先选择昨天日期或已成功抓取过的日期测试。")
 
 if st.button("开始抓取", type="primary"):
     try:
@@ -269,8 +300,18 @@ if st.button("开始抓取", type="primary"):
         st.info(f"本次 ChatGPT 半自动分析任务码：{st.session_state.task_code}")
 
     except Exception as e:
-        st.error("抓取失败。")
-        st.exception(e)
+        st.error("抓取失败，请先按下面原因排查：")
+        st.markdown(
+            """
+            1. 当天人民日报电子版可能尚未更新。
+            2. 所选日期或版面不存在。
+            3. 网络暂时异常。
+            4. 人民日报页面结构可能变化。
+            5. 建议先切换到昨天日期或已成功抓取过的日期测试。
+            """
+        )
+        with st.expander("查看技术错误"):
+            st.exception(e)
 
 if st.session_state.best_df is not None and not st.session_state.best_df.empty:
     raw_df = st.session_state.df.copy()
@@ -282,11 +323,13 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
     if interview_keyword.strip():
         filtered_df = filtered_df[filtered_df["可转化面试题型"].fillna("").str.contains(interview_keyword.strip())]
 
-    top_df, shenlun_df, interview_df, bilingual_df, review_df = make_study_sheets(df)
+    top_df, shenlun_df, interview_df, bilingual_df, cloze_df, review_df = make_study_sheets(df)
     prompt_first_df = build_prompt_first_sheet(df, task_code=st.session_state.task_code, top_n=min(chatgpt_package_top_n, len(df)))
     prompt_df = build_prompt_sheet(df, top_n=min(10, len(df)))
     chatgpt_package_df = build_chatgpt_package(df, task_code=st.session_state.task_code, top_n=min(chatgpt_package_top_n, len(df)))
     markdown_package = build_chatgpt_markdown_package(df, task_code=st.session_state.task_code, top_n=min(chatgpt_package_top_n, len(df)))
+
+    mobile_quick = usage_mode == "手机快速模式"
 
     st.markdown("### 数据概览")
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -298,40 +341,50 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
 
     st.markdown("### 今日精品文章")
     st.success("本表只显示最终进入学习包的精品文章，最多10篇。")
-    st.dataframe(filtered_df, use_container_width=True)
+    if mobile_quick:
+        st.info("手机快速模式已简化表格预览，优先使用下方 Markdown 下载按钮。")
+        st.dataframe(filtered_df[["日期", "版面", "标题", "考公价值分", "主题标签", "链接"]], width="stretch", height=260)
+    else:
+        st.dataframe(filtered_df, width="stretch")
 
     st.markdown("### ChatGPT 半自动使用说明")
     st.success(f"任务码：{st.session_state.task_code}")
     st.info("推荐下载 Markdown 分析包，上传到 ChatGPT App。Markdown 内已经内置完整指令，包括解析后按文章分别生成 Word 并打包 zip 返回。")
-    st.dataframe(prompt_first_df, use_container_width=True)
+    st.text_area("复制给 ChatGPT 的完整指令", value=CHATGPT_COPY_INSTRUCTION, height=150)
+    if not mobile_quick:
+        st.dataframe(prompt_first_df, width="stretch")
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-        "先看这里",
-        "精品Top10",
-        "候选文章池",
-        "申论素材卡",
-        "面试题库",
-        "今日复盘",
-        "ChatGPT待分析包",
-        "AI提示词",
-    ])
+    if not mobile_quick:
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+            "先看这里",
+            "精品Top10",
+            "候选文章池",
+            "申论素材卡",
+            "面试题库",
+            "逻辑填空",
+            "今日复盘",
+            "ChatGPT待分析包",
+            "AI提示词",
+        ])
 
-    with tab1:
-        st.dataframe(prompt_first_df, use_container_width=True)
-    with tab2:
-        st.dataframe(top_df, use_container_width=True)
-    with tab3:
-        st.dataframe(raw_df, use_container_width=True)
-    with tab4:
-        st.dataframe(shenlun_df, use_container_width=True)
-    with tab5:
-        st.dataframe(interview_df, use_container_width=True)
-    with tab6:
-        st.dataframe(review_df, use_container_width=True)
-    with tab7:
-        st.dataframe(chatgpt_package_df, use_container_width=True)
-    with tab8:
-        st.dataframe(prompt_df, use_container_width=True)
+        with tab1:
+            st.dataframe(prompt_first_df, width="stretch")
+        with tab2:
+            st.dataframe(top_df, width="stretch")
+        with tab3:
+            st.dataframe(raw_df, width="stretch")
+        with tab4:
+            st.dataframe(shenlun_df, width="stretch")
+        with tab5:
+            st.dataframe(interview_df, width="stretch")
+        with tab6:
+            st.dataframe(cloze_df, width="stretch")
+        with tab7:
+            st.dataframe(review_df, width="stretch")
+        with tab8:
+            st.dataframe(chatgpt_package_df, width="stretch")
+        with tab9:
+            st.dataframe(prompt_df, width="stretch")
 
     sheets = {
         "先看这里_ChatGPT提示词": prompt_first_df,
@@ -340,45 +393,69 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
         "申论素材卡": shenlun_df,
         "面试题库": interview_df,
         "中英表达": bilingual_df,
+        "逻辑填空积累": cloze_df,
         "今日复盘": review_df,
         "ChatGPT待分析包": chatgpt_package_df,
         "AI提示词": prompt_df,
     }
 
-    excel_bytes = export_beautified_excel(sheets)
+    st.markdown("### 下载区")
     st.download_button(
-        label="下载 V6.1 精品 Excel学习包",
-        data=excel_bytes,
-        file_name=f"人民日报_{st.session_state.current_task}_V6.1精品学习包.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-    article_zip_bytes = create_article_docx_zip(
-        df,
-        task_code=st.session_state.task_code,
-        top_n=min(top_n_word, len(df)),
-    )
-    st.download_button(
-        label="下载原始精品文章单独Word压缩包",
-        data=article_zip_bytes,
-        file_name=f"人民日报_{st.session_state.current_task}_原始精品文章单独Word.zip",
-        mime="application/zip",
-    )
-
-    combined_docx = create_combined_docx(df, task_code=st.session_state.task_code, top_n=min(top_n_word, len(df)))
-    st.download_button(
-        label="下载原始精品总学习笔记Word",
-        data=combined_docx,
-        file_name=f"人民日报_{st.session_state.current_task}_原始精品总学习笔记.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
-
-    st.download_button(
-        label="下载给ChatGPT上传的精品Markdown分析包",
+        label="下载 V6.2 精品 Markdown 分析包（手机推荐）",
         data=markdown_package.encode("utf-8"),
-        file_name=f"人民日报_{st.session_state.current_task}_V6.1_ChatGPT精品分析包.md",
+        file_name=f"人民日报_{st.session_state.current_task}_V6.2_ChatGPT精品分析包.md",
         mime="text/markdown",
+        type="primary",
     )
+
+    excel_bytes = export_beautified_excel(sheets)
+    if mobile_quick:
+        with st.expander("电脑端下载：Excel 和 Word"):
+            st.download_button(
+                label="下载 V6.2 精品 Excel学习包",
+                data=excel_bytes,
+                file_name=f"人民日报_{st.session_state.current_task}_V6.2精品学习包.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+            article_zip_bytes = create_article_docx_zip(
+                df,
+                task_code=st.session_state.task_code,
+                top_n=min(top_n_word, len(df)),
+            )
+            st.download_button(
+                label="下载原始精品文章单独Word压缩包",
+                data=article_zip_bytes,
+                file_name=f"人民日报_{st.session_state.current_task}_原始精品文章单独Word.zip",
+                mime="application/zip",
+            )
+    else:
+        st.download_button(
+            label="下载 V6.2 精品 Excel学习包",
+            data=excel_bytes,
+            file_name=f"人民日报_{st.session_state.current_task}_V6.2精品学习包.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        article_zip_bytes = create_article_docx_zip(
+            df,
+            task_code=st.session_state.task_code,
+            top_n=min(top_n_word, len(df)),
+        )
+        st.download_button(
+            label="下载原始精品文章单独Word压缩包",
+            data=article_zip_bytes,
+            file_name=f"人民日报_{st.session_state.current_task}_原始精品文章单独Word.zip",
+            mime="application/zip",
+        )
+
+        combined_docx = create_combined_docx(df, task_code=st.session_state.task_code, top_n=min(top_n_word, len(df)))
+        st.download_button(
+            label="下载原始精品总学习笔记Word",
+            data=combined_docx,
+            file_name=f"人民日报_{st.session_state.current_task}_原始精品总学习笔记.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
 
 st.divider()
-st.caption("说明：V6.1不调用任何AI API，不需要API Key。Markdown分析包内置指令：解析后按文章分别生成Word并打包zip返回。")
+st.caption("说明：V6.2不调用任何AI API，不需要API Key。Markdown分析包内置逻辑填空积累指令：解析后按文章分别生成Word并打包zip返回。")

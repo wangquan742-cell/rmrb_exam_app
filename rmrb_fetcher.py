@@ -496,7 +496,7 @@ def articles_to_dataframe(articles: List[Article]) -> pd.DataFrame:
             "逻辑填空积累": generate_cloze_accumulation(tags, item.title),
             "复习状态": "未复习",
             "个人笔记": "",
-            "备注": "V6.2：手机体验 + 逻辑填空积累版"
+            "备注": "V7：Top10候选 + 2—3篇超详细精读版"
         })
 
     df = pd.DataFrame(rows)

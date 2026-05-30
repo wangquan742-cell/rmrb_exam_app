@@ -413,3 +413,16 @@ def build_markdown_package(
         deep_n=deep_n,
         deep_read_count=deep_read_count,
     )
+
+
+__all__ = [
+    "CHATGPT_COPY_INSTRUCTION",
+    "build_task_code",
+    "build_deep_reading_prompt",
+    "build_prompt_first_sheet",
+    "build_prompt_sheet",
+    "build_chatgpt_package",
+    "build_chatgpt_markdown_package",
+    "build_markdown_package",
+    "build_full_reading_task",
+]

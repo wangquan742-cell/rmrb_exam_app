@@ -321,7 +321,7 @@ def build_chatgpt_markdown_package(
     return "\n".join(lines)
 
 
-def build_full_reading_task(
+def _build_full_reading_task_impl(
     df: pd.DataFrame,
     task_code: str,
     candidate_top_n: int = 10,
@@ -394,6 +394,55 @@ def build_full_reading_task(
     lines.append("如果当前 ChatGPT 环境支持生成文件，请把每篇深度精读文章分别生成 Word 文档，并把所有 Word 打包成一个 zip 文件返回给我下载。")
 
     return "\n".join(lines)
+
+
+def build_full_reading_task(df, task_code="", candidate_top_n=10, deep_n=3, deep_read_count=None):
+    """
+    稳定公开入口：生成手机端“复制完整精读任务”的纯文本。
+
+    这个函数名必须真实存在，供 app.py 和 Streamlit Cloud 直接导入。
+    deep_n 与 deep_read_count 都兼容，避免参数名不一致导致 TypeError。
+    """
+    if deep_read_count is not None:
+        deep_n = deep_read_count
+
+    if df is None or getattr(df, "empty", True):
+        return "\n".join([
+            "人民日报考公考编学习助手 V7.1：超详细精读任务",
+            f"任务码：{task_code}",
+            "",
+            "当前没有可分析文章。请先完成人民日报文章抓取。",
+        ])
+
+    try:
+        return _build_full_reading_task_impl(
+            df,
+            task_code=task_code,
+            candidate_top_n=candidate_top_n,
+            deep_n=deep_n,
+        )
+    except Exception:
+        candidate_df = df.head(candidate_top_n)
+        deep_df = candidate_df.head(deep_n)
+        lines = [
+            "人民日报考公考编学习助手 V7.1：超详细精读任务",
+            f"任务码：{task_code}",
+            "",
+            "Top10 是候选池，不要平均分析 10 篇；默认只精读最有价值的 3 篇。",
+            "请把每篇精读文章都按用户单独发送人民日报网址的标准精读。",
+            "必须包括：原文内容精讲、段落结构精拆、政策背景、申论素材、面试迁移、行测篇章阅读、逻辑填空、金句表达。",
+            "",
+        ]
+        for idx, (_, row) in enumerate(deep_df.iterrows(), start=1):
+            row_dict = row.to_dict()
+            lines.extend([
+                f"深度精读文章 {idx}：{row_dict.get('标题', '')}",
+                f"链接：{row_dict.get('链接', '')}",
+                "正文全文或正文预览：",
+                str(row_dict.get("正文全文", "") or row_dict.get("正文预览", ""))[:7000],
+                "",
+            ])
+        return "\n".join(lines)
 
 
 def build_markdown_package(

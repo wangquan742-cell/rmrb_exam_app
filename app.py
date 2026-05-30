@@ -6,6 +6,7 @@ import streamlit as st
 
 from ai_utils import (
     CHATGPT_COPY_INSTRUCTION,
+    build_full_reading_task,
     build_chatgpt_markdown_package,
     build_chatgpt_package,
     build_prompt_first_sheet,
@@ -19,7 +20,7 @@ from rmrb_fetcher import articles_to_dataframe, fetch_multiple_pages, make_study
 
 def get_app_password():
     """
-    V7 可选访问密码：
+    V7.1 可选访问密码：
     1. Streamlit Cloud：在 Secrets 里配置 APP_PASSWORD
     2. 本地运行：可设置环境变量 APP_PASSWORD
     3. 如果都没配置，则默认不启用密码
@@ -103,7 +104,7 @@ def ensure_content_column(df: pd.DataFrame, articles):
 
 
 st.set_page_config(
-    page_title="人民日报考公学习助手 V7",
+    page_title="人民日报考公学习助手 V7.1",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -147,33 +148,36 @@ st.markdown(
 
 require_password()
 
-st.title("📰 人民日报考公考编学习助手 V7")
-st.caption("Top10候选 + 2—3篇超详细精读版：纯 ChatGPT 半自动、不接任何 AI API、不需要 API Key。")
+st.title("📰 人民日报考公考编学习助手 V7.1")
+st.caption("三篇超详细精读 + 手机一键复制任务版：纯 ChatGPT 半自动、不接任何 AI API、不需要 API Key。")
 
 st.markdown("### 今日使用流程")
 flow_cols = st.columns(3)
 flow_cols[0].markdown("**1. 选择日期和版面**  \n在侧边栏设置日期、版面范围和正文抓取。")
 flow_cols[1].markdown("**2. 点击开始抓取**  \n系统自动筛选 Top10 候选文章。")
-flow_cols[2].markdown("**3. 设置深度精读篇数**  \n默认只精读前3篇，不平均分析10篇。")
+flow_cols[2].markdown("**3. 设置深度精读篇数**  \n默认3篇，可选2、3、5篇。")
 flow_cols = st.columns(3)
-flow_cols[0].markdown("**4. 下载 Markdown 分析包**  \n手机端优先下载 Markdown。")
-flow_cols[1].markdown("**5. 上传到 ChatGPT App**  \n对 ChatGPT 说“按分析包执行”。")
+flow_cols[0].markdown("**4. 复制完整精读任务**  \n手机端优先复制文本任务。")
+flow_cols[1].markdown("**5. 打开 ChatGPT 粘贴发送**  \n网站不能自动替你上传或发送。")
 flow_cols[2].markdown("**6. 生成 Word 并打包 zip**  \nChatGPT 按深度文章分别返回 Word。")
 
 st.info("手机端提示：推荐手机端优先下载 Markdown 分析包；Excel 和 Word 更适合电脑端使用。如果今天抓不到，可能当天还未更新，建议选择昨天日期。")
 
 st.markdown("### 复制给 ChatGPT 的指令")
-st.text_area("上传 Markdown 分析包后，复制这段话给 ChatGPT", value=CHATGPT_COPY_INSTRUCTION, height=150)
+st.text_area("复制或上传任务后，给 ChatGPT 的总指令", value=CHATGPT_COPY_INSTRUCTION, height=150)
 st.code(CHATGPT_COPY_INSTRUCTION, language="text")
 
-with st.expander("使用说明"):
+with st.expander("📘 使用说明 / 模式区别 / 精读逻辑"):
     st.markdown(
         """
-        - 手机快速模式：突出 Markdown 下载按钮，表格预览更轻，适合手机端把分析包上传到 ChatGPT App。
+        - 手机快速模式：优先显示“复制完整精读任务”“打开 ChatGPT”“下载 Markdown 备用”，适合手机端操作。
         - 电脑完整模式：显示 Excel、Word、Markdown 全部下载按钮，并保留完整表格预览。
         - Top10候选：系统每天最多筛选10篇候选文章，作为今日素材池。
-        - 深度精读篇数：默认3篇，只对候选池前2—3篇做超详细精读，避免把10篇文章平均分析得很浅。
-        - Markdown使用方法：下载 V7 Markdown 分析包，上传到 ChatGPT App，然后复制页面里的指令；ChatGPT 会按深度任务块逐篇生成 Word，并打包 zip 返回。
+        - 深度精读3篇：默认只精读最有价值的3篇，可选2、3、5篇；不建议一次精读10篇，因为会把单篇分析压得很浅。
+        - 复制任务怎么用：抓取完成后复制完整精读任务，打开 ChatGPT，粘贴并发送。
+        - 打开 ChatGPT 后怎么发送：如果用手机，先点“复制完整精读任务”，再点“打开 ChatGPT”，进入对话框后长按粘贴并发送。
+        - 安全限制说明：浏览器不能自动替你上传文件到 ChatGPT，也不能自动替你点击发送；当前最佳流程是复制任务 → 打开 ChatGPT → 粘贴发送。
+        - Markdown使用方法：Markdown 是备用方案，适合电脑端上传文件；手机端优先用复制任务。
         """
     )
 
@@ -230,18 +234,16 @@ with st.sidebar:
     st.divider()
     st.header("输出设置")
 
-    top_n_word = st.slider("生成Word文章篇数", min_value=1, max_value=10, value=8)
-    deep_reading_count = st.slider(
+    deep_reading_count = st.select_slider(
         "深度精读篇数",
-        min_value=2,
-        max_value=3,
+        options=[2, 3, 5],
         value=3,
-        help="V7建议只精读前2—3篇。Top10只是候选池，不要让ChatGPT平均分析10篇。"
+        help="V7.1建议默认精读3篇。Top10只是候选池，不要让ChatGPT平均分析10篇。"
     )
 
     st.divider()
     st.header("手机/公网")
-    st.caption("V7 可部署到 Streamlit Community Cloud，生成公网网址后 iPhone Safari 可以直接打开。")
+    st.caption("V7.1 可部署到 Streamlit Community Cloud，生成公网网址后 iPhone Safari 可以直接打开。")
     st.caption("本地同 Wi‑Fi 也可用 Mac 局域网 IP 访问。部署步骤见压缩包内 DEPLOY_TO_PUBLIC_WEB.md。")
 
 date_str = selected_date.strftime("%Y-%m-%d")
@@ -261,10 +263,10 @@ else:
 
 st.subheader("当前任务")
 st.write(f"准备抓取：**{date_str} 第 {', '.join(pages)} 版**")
-st.info(f"本版本每天最多输出 **{max_best_articles} 篇Top候选文章**，Markdown 默认只对前 **{deep_reading_count} 篇**做超详细精读。")
+st.info(f"本版本每天最多输出 **{max_best_articles} 篇Top候选文章**，复制任务和 Markdown 默认只围绕前 **{deep_reading_count} 篇**深度精读文章生成。")
 
 if include_content:
-    st.warning(f"本次会继续抓取候选文章正文，最多抓取 {max_content_articles} 篇；最终只保留Top {max_best_articles}候选，并精读前{deep_reading_count}篇。")
+    st.warning(f"本次会继续抓取候选文章正文，最多抓取 {max_content_articles} 篇；最终保留Top {max_best_articles}候选，并精读前{deep_reading_count}篇。")
 else:
     st.info("当前只抓取文章标题和链接，不抓取正文。")
 
@@ -350,7 +352,7 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
         candidate_top_n=candidate_count,
         deep_n=deep_count,
     )
-    prompt_df = build_prompt_sheet(df, top_n=deep_count)
+    prompt_df = build_prompt_sheet(df, deep_n=deep_count)
     chatgpt_package_df = build_chatgpt_package(
         df,
         task_code=st.session_state.task_code,
@@ -363,6 +365,13 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
         candidate_top_n=candidate_count,
         deep_n=deep_count,
     )
+    full_reading_task = build_full_reading_task(
+        df,
+        task_code=st.session_state.task_code,
+        candidate_top_n=candidate_count,
+        deep_n=deep_count,
+    )
+    deep_df = df.sort_values(by="考公价值分", ascending=False).head(deep_count)
 
     mobile_quick = usage_mode == "手机快速模式"
 
@@ -374,17 +383,30 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
     col4.metric("最高考公价值分", int(df["考公价值分"].max()))
     col5.metric("深度精读篇数", deep_count)
 
+    if mobile_quick:
+        st.markdown("### 手机快速操作区")
+        st.success("推荐流程：复制完整精读任务 → 打开 ChatGPT → 粘贴发送。Markdown 作为备用下载。")
+        st.caption("由于浏览器安全限制，网站不能自动替你上传文件到 ChatGPT，也不能自动替你点击发送。")
+        st.text_area("复制完整精读任务", value=full_reading_task, height=360)
+        st.link_button("打开 ChatGPT", "https://chatgpt.com", type="primary")
+        st.download_button(
+            label="下载 V7.1 Markdown备用分析包",
+            data=markdown_package.encode("utf-8"),
+            file_name=f"人民日报_{st.session_state.current_task}_V7.1_深度精读{deep_count}篇.md",
+            mime="text/markdown",
+        )
+
     st.markdown("### 今日Top10候选文章")
     st.success(f"本表显示今日候选文章，最多10篇；Markdown只要求ChatGPT对前{deep_count}篇做超详细精读。")
     if mobile_quick:
-        st.info("手机快速模式已简化表格预览，优先使用下方 Markdown 下载按钮。")
+        st.info("手机快速模式已简化表格预览，优先使用上方“复制完整精读任务”。")
         st.dataframe(filtered_df[["日期", "版面", "标题", "考公价值分", "主题标签", "链接"]], width="stretch", height=260)
     else:
         st.dataframe(filtered_df, width="stretch")
 
     st.markdown("### ChatGPT 半自动使用说明")
     st.success(f"任务码：{st.session_state.task_code}")
-    st.info(f"推荐下载 Markdown 分析包，上传到 ChatGPT App。Top10只是候选，不要平均分析全部文章；V7会要求只对前{deep_count}篇做超详细精读。")
+    st.info(f"手机端推荐复制完整精读任务；电脑端可下载 Markdown。Top10只是候选，不要平均分析全部文章；V7.1只围绕前{deep_count}篇做超详细精读。")
     st.text_area("复制给 ChatGPT 的完整指令", value=CHATGPT_COPY_INSTRUCTION, height=150)
     if not mobile_quick:
         st.dataframe(prompt_first_df, width="stretch")
@@ -392,7 +414,7 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
     if not mobile_quick:
         tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
             "先看这里",
-        "Top10候选",
+            "Top10候选",
             "候选文章池",
             "申论素材卡",
             "面试题库",
@@ -423,7 +445,7 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
 
     sheets = {
         "先看这里_ChatGPT提示词": prompt_first_df,
-        "今日精品文章Top10": df,
+        "今日Top10候选": df,
         "候选文章池": raw_df,
         "申论素材卡": shenlun_df,
         "面试题库": interview_df,
@@ -435,28 +457,29 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
     }
 
     st.markdown("### 下载区")
-    st.download_button(
-        label="下载 V7 Markdown分析包（手机推荐）",
-        data=markdown_package.encode("utf-8"),
-        file_name=f"人民日报_{st.session_state.current_task}_V7_Top10候选_深度精读{deep_count}篇.md",
-        mime="text/markdown",
-        type="primary",
-    )
+    if not mobile_quick:
+        st.download_button(
+            label="下载 V7.1 Markdown分析包",
+            data=markdown_package.encode("utf-8"),
+            file_name=f"人民日报_{st.session_state.current_task}_V7.1_Top10候选_深度精读{deep_count}篇.md",
+            mime="text/markdown",
+            type="primary",
+        )
 
     excel_bytes = export_beautified_excel(sheets)
     if mobile_quick:
         with st.expander("电脑端下载：Excel 和 Word"):
             st.download_button(
-                label="下载 V7 Excel学习包",
+                label="下载 V7.1 Excel学习包",
                 data=excel_bytes,
-                file_name=f"人民日报_{st.session_state.current_task}_V7学习包.xlsx",
+                file_name=f"人民日报_{st.session_state.current_task}_V7.1学习包.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
             article_zip_bytes = create_article_docx_zip(
-                df,
+                deep_df,
                 task_code=st.session_state.task_code,
-                top_n=min(top_n_word, len(df)),
+                top_n=len(deep_df),
             )
             st.download_button(
                 label="下载原始精品文章单独Word压缩包",
@@ -466,16 +489,16 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
             )
     else:
         st.download_button(
-            label="下载 V7 Excel学习包",
+            label="下载 V7.1 Excel学习包",
             data=excel_bytes,
-            file_name=f"人民日报_{st.session_state.current_task}_V7学习包.xlsx",
+            file_name=f"人民日报_{st.session_state.current_task}_V7.1学习包.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
         article_zip_bytes = create_article_docx_zip(
-            df,
+            deep_df,
             task_code=st.session_state.task_code,
-            top_n=min(top_n_word, len(df)),
+            top_n=len(deep_df),
         )
         st.download_button(
             label="下载原始精品文章单独Word压缩包",
@@ -484,7 +507,7 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
             mime="application/zip",
         )
 
-        combined_docx = create_combined_docx(df, task_code=st.session_state.task_code, top_n=min(top_n_word, len(df)))
+        combined_docx = create_combined_docx(deep_df, task_code=st.session_state.task_code, top_n=len(deep_df))
         st.download_button(
             label="下载原始精品总学习笔记Word",
             data=combined_docx,
@@ -493,4 +516,4 @@ if st.session_state.best_df is not None and not st.session_state.best_df.empty:
         )
 
 st.divider()
-st.caption("说明：V7不调用任何AI API，不需要API Key。Top10只是候选，Markdown默认只要求前2—3篇超详细精读，并保留逻辑填空积累模块。")
+st.caption("说明：V7.1不调用任何AI API，不需要API Key。Top10只是候选，复制任务/Markdown默认只围绕深度精读文章生成，并保留逻辑填空积累模块。")

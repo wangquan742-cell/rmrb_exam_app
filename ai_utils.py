@@ -2,7 +2,7 @@ from typing import Dict
 import pandas as pd
 
 
-CHATGPT_COPY_INSTRUCTION = "请读取我上传的 Markdown 分析包，按文件内置的 V7 深度精读指令执行。注意：Top10 只是候选文章，不要平均分析全部文章；请只对文件标记的前2—3篇深度文章做超详细精读，宁可少篇数，也要单篇讲透。每篇文章都要像我单独发给你一个网址一样详细分析：原文内容精讲、段落结构精拆、政策背景和深层逻辑、申论可用素材、面试迁移和开口思路、行测篇章阅读结构、逻辑填空积累、金句和规范表达。完成解析后，请把不同文章分别生成 Word 文档，并把所有 Word 打包成一个 zip 文件返回给我下载。"
+CHATGPT_COPY_INSTRUCTION = "请读取我粘贴或上传的 V7.1 精读任务。注意：Top10 只是候选池，不要平均分析全部文章；请只对标记为“深度精读”的文章做超详细精读，默认3篇，可为2、3或5篇。宁可只分析3篇，也不要浅分析10篇。每篇精读文章都要像我单独发送一个人民日报网址一样详细分析：原文内容精讲、段落结构精拆、政策背景和深层逻辑、申论可用素材、面试迁移和开口思路、行测篇章阅读结构、逻辑填空积累、金句和规范表达。完成解析后，请把不同精读文章分别生成 Word 文档，并把所有 Word 打包成一个 zip 文件返回给我下载。"
 
 
 def build_task_code(date_str: str, task_name: str = "人民日报深度精读") -> str:
@@ -12,7 +12,7 @@ def build_task_code(date_str: str, task_name: str = "人民日报深度精读") 
 
 def build_deep_reading_prompt(row: Dict) -> str:
     """
-    V7 超详细深度精读提示词。
+    V7.1 超详细深度精读提示词。
     不调用任何 API，专门用于导出 Markdown / Excel 后上传给 ChatGPT App。
     """
     title = row.get("标题", "")
@@ -23,7 +23,7 @@ def build_deep_reading_prompt(row: Dict) -> str:
     link = row.get("链接", "")
 
     return f"""
-你是我的“人民日报公考考编超详细精读教练”。请把这篇文章当成我单独发送给你的一个网址来处理，不要因为分析包里还有其他候选文章就压缩篇幅。不要只做简单总结，不要泛泛而谈。我要的是像精读课一样，把文章讲透，让我即使不看原文，也能知道原文讲了什么、每段怎么推进、为什么这么讲、背后的政策逻辑是什么、如何迁移到申论/面试/行测言语/逻辑填空/机关思维/产业工业视角中。
+你是我的“人民日报公考考编超详细精读教练”。请把这篇文章当成我单独发送给你的一个人民日报网址来处理，不要因为任务里还有其他候选文章就压缩篇幅。不要只做简单总结，不要泛泛而谈。我要的是像精读课一样，把文章讲透，让我即使不看原文，也能知道原文讲了什么、每段怎么推进、为什么这么讲、背后的政策逻辑是什么、如何迁移到申论/面试/行测言语/逻辑填空/机关思维/产业工业视角中。
 
 【文章信息】
 标题：{title}
@@ -35,7 +35,7 @@ def build_deep_reading_prompt(row: Dict) -> str:
 【文章原文/正文预览】
 {content}
 
-【V7总要求】
+【V7.1总要求】
 请严格按照以下结构输出。每一部分都要尽量贴合原文，不要空泛套话。请把原文中的关键内容、段落推进、政策背景、关键逻辑、关键表达讲出来。重点不是“概括得短”，而是“讲得清楚、能积累、能迁移”。如果篇幅不够，宁可减少分析文章数量，也不要压缩单篇质量。
 
 一、原文关键内容精读：让我不看原文也知道文章讲了什么
@@ -144,13 +144,17 @@ def build_prompt_first_sheet(
     task_code: str,
     candidate_top_n: int = 10,
     deep_n: int = 3,
+    deep_read_count: int = None,
 ) -> pd.DataFrame:
+    if deep_read_count is not None:
+        deep_n = deep_read_count
+
     return pd.DataFrame([
         {
             "序号": 1,
             "用途": "最推荐：上传Markdown/Excel后复制这句话给ChatGPT",
             "复制给ChatGPT的内容": f"{CHATGPT_COPY_INSTRUCTION} 任务码：{task_code}。Top{candidate_top_n} 只是候选，请只对前{deep_n}篇做超详细精读。",
-            "说明": "把Markdown分析包上传到当前ChatGPT窗口后，复制这一句话即可。",
+            "说明": "手机端推荐直接复制完整精读任务；也可以上传Markdown后复制这句话。",
         },
         {
             "序号": 2,
@@ -166,16 +170,28 @@ def build_prompt_first_sheet(
         },
         {
             "序号": 4,
-            "用途": "V7模式说明",
-            "复制给ChatGPT的内容": "V7不调用任何API，不需要任何API Key。Top10只是候选池，不要平均分析10篇文章；请按Markdown标记的深度精读篇数，只对前2—3篇做单篇超详细精读。",
+            "用途": "V7.1模式说明",
+            "复制给ChatGPT的内容": "V7.1不调用任何API，不需要任何API Key。Top10只是候选池，不要平均分析10篇文章；请按Markdown或复制任务标记的深度精读篇数，只对前2、3或5篇做单篇超详细精读。",
             "说明": "防止混淆。",
         },
     ])
 
 
-def build_prompt_sheet(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+def build_prompt_sheet(
+    df: pd.DataFrame,
+    top_n: int = None,
+    deep_n: int = None,
+    deep_read_count: int = None,
+) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
+
+    if deep_read_count is not None:
+        deep_n = deep_read_count
+    if deep_n is not None:
+        top_n = deep_n
+    if top_n is None:
+        top_n = 3
 
     top_df = df.sort_values(by="考公价值分", ascending=False).head(top_n)
     rows = []
@@ -197,9 +213,13 @@ def build_chatgpt_package(
     task_code: str,
     candidate_top_n: int = 10,
     deep_n: int = 3,
+    deep_read_count: int = None,
 ) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
+
+    if deep_read_count is not None:
+        deep_n = deep_read_count
 
     top_df = df.sort_values(by="考公价值分", ascending=False).head(candidate_top_n)
     rows = []
@@ -209,7 +229,7 @@ def build_chatgpt_package(
         rows.append({
             "任务码": task_code,
             "分析优先级": priority,
-            "V7处理方式": "超详细精读" if priority <= deep_n else "候选备用，不默认精读",
+            "V7.1处理方式": "超详细精读" if priority <= deep_n else "候选备用，不默认精读",
             "日期": row_dict.get("日期", ""),
             "版面": row_dict.get("版面", ""),
             "标题": row_dict.get("标题", ""),
@@ -224,7 +244,7 @@ def build_chatgpt_package(
             "逻辑填空积累_规则版": row_dict.get("逻辑填空积累", ""),
             "正文预览": row_dict.get("正文预览", ""),
             "链接": row_dict.get("链接", ""),
-            "请ChatGPT输出": "Top10只是候选，不要平均分析全部文章；只对标记为超详细精读的前2—3篇输出：原文内容精讲、段落结构精拆、政策背景和深层逻辑、申论可用素材、面试迁移和开口思路、行测篇章阅读结构、逻辑填空积累、金句和规范表达，并按文章分别生成Word后打包zip",
+            "请ChatGPT输出": "Top10只是候选，不要平均分析全部文章；只对标记为超详细精读的文章输出：原文内容精讲、段落结构精拆、政策背景和深层逻辑、申论可用素材、面试迁移和开口思路、行测篇章阅读结构、逻辑填空积累、金句和规范表达，并按文章分别生成Word后打包zip",
         })
     return pd.DataFrame(rows)
 
@@ -234,14 +254,18 @@ def build_chatgpt_markdown_package(
     task_code: str,
     candidate_top_n: int = 10,
     deep_n: int = 3,
+    deep_read_count: int = None,
 ) -> str:
     if df.empty:
         return ""
 
+    if deep_read_count is not None:
+        deep_n = deep_read_count
+
     candidate_df = df.sort_values(by="考公价值分", ascending=False).head(candidate_top_n)
     deep_df = candidate_df.head(deep_n)
     lines = []
-    lines.append("# 人民日报考公考编学习助手 V7 Markdown分析包")
+    lines.append("# 人民日报考公考编学习助手 V7.1 Markdown分析包")
     lines.append("")
     lines.append(f"任务码：{task_code}")
     lines.append(f"Top10候选文章数：{len(candidate_df)}")
@@ -253,7 +277,7 @@ def build_chatgpt_markdown_package(
     lines.append("")
     lines.append(f"> {CHATGPT_COPY_INSTRUCTION}")
     lines.append("")
-    lines.append("## V7核心规则")
+    lines.append("## V7.1核心规则")
     lines.append("")
     lines.append("1. Top10只是候选池，用来让我知道今天有哪些可选文章。")
     lines.append(f"2. 不要平均分析全部候选文章，只对前{len(deep_df)}篇“深度精读任务块”做超详细精读。")
@@ -289,9 +313,103 @@ def build_chatgpt_markdown_package(
         lines.append("")
         lines.append(str(row_dict.get("正文全文", "") or row_dict.get("正文预览", ""))[:5000])
         lines.append("")
-        lines.append("### 本文V7超详细精读提示词")
+        lines.append("### 本文V7.1超详细精读提示词")
         lines.append("")
         lines.append(build_deep_reading_prompt(row_dict))
         lines.append("")
 
     return "\n".join(lines)
+
+
+def build_full_reading_task(
+    df: pd.DataFrame,
+    task_code: str,
+    candidate_top_n: int = 10,
+    deep_n: int = 3,
+    deep_read_count: int = None,
+) -> str:
+    """
+    生成手机端可直接复制到 ChatGPT 的完整任务文本。
+    """
+    if df.empty:
+        return ""
+
+    if deep_read_count is not None:
+        deep_n = deep_read_count
+
+    candidate_df = df.sort_values(by="考公价值分", ascending=False).head(candidate_top_n)
+    deep_df = candidate_df.head(deep_n)
+
+    lines = []
+    lines.append("人民日报考公考编学习助手 V7.1：超详细精读任务")
+    lines.append("")
+    lines.append(f"任务码：{task_code}")
+    lines.append(f"Top10候选文章数：{len(candidate_df)}")
+    lines.append(f"本次深度精读篇数：{len(deep_df)}")
+    lines.append("")
+    lines.append("【全局指令】")
+    lines.append(CHATGPT_COPY_INSTRUCTION)
+    lines.append("")
+    lines.append("请特别注意：")
+    lines.append("1. Top10只是候选池，不要平均分析全部文章。")
+    lines.append(f"2. 只分析下面标记为“深度精读”的{len(deep_df)}篇文章。")
+    lines.append("3. 宁可只分析3篇，也不要浅分析10篇。")
+    lines.append("4. 每篇精读文章都要像我单独发送一个人民日报网址一样详细分析，不要压缩，不怕长，不要泛泛总结。")
+    lines.append("5. 浏览器无法替我自动上传文件到 ChatGPT，也无法自动点击发送；我会把这段任务粘贴给你，请直接执行。")
+    lines.append("")
+    lines.append("【Top10候选池】")
+    for idx, (_, row) in enumerate(candidate_df.iterrows(), start=1):
+        row_dict = row.to_dict()
+        marker = "深度精读" if idx <= len(deep_df) else "候选备用"
+        lines.append(f"{idx}. 【{marker}】{row_dict.get('标题', '')}｜{row_dict.get('链接', '')}｜考公价值分：{row_dict.get('考公价值分', '')}｜标签：{row_dict.get('主题标签', '')}")
+    lines.append("")
+
+    for idx, (_, row) in enumerate(deep_df.iterrows(), start=1):
+        row_dict = row.to_dict()
+        lines.append("====================")
+        lines.append(f"深度精读文章 {idx}：{row_dict.get('标题', '')}")
+        lines.append("====================")
+        lines.append(f"日期：{row_dict.get('日期', '')}")
+        lines.append(f"版面：{row_dict.get('版面', '')}")
+        lines.append(f"主题标签：{row_dict.get('主题标签', '')}")
+        lines.append(f"机关思维：{row_dict.get('机关思维', '')}")
+        lines.append(f"链接：{row_dict.get('链接', '')}")
+        lines.append("")
+        lines.append("【正文全文或正文预览】")
+        lines.append(str(row_dict.get("正文全文", "") or row_dict.get("正文预览", ""))[:7000])
+        lines.append("")
+        lines.append("【逐篇精读要求】")
+        lines.append("请把这篇文章当作我单独发送的人民日报网址来分析，必须包含：")
+        lines.append("1. 原文内容精讲：让我不看原文也知道文章讲什么。")
+        lines.append("2. 段落结构精拆：背景、问题、原因、对策、递进、让步、总结。")
+        lines.append("3. 政策背景和深层逻辑：讲清为什么人民日报要写这篇文章。")
+        lines.append("4. 申论素材转化：不要泛泛说价值，要给出可直接写进申论的案例、分论点、规范表达。")
+        lines.append("5. 面试迁移：题型、关键词拆解、帽子怎么想、开口第一句、答题路线。")
+        lines.append("6. 行测篇章阅读训练：主旨句、意图判断、逻辑词、迷惑项设置。")
+        lines.append("7. 逻辑填空积累：高频实词、固定搭配、近义词辨析、语境关系、仿真题、错项解析。")
+        lines.append("8. 金句和规范表达。")
+        lines.append("")
+
+    lines.append("【输出文件要求】")
+    lines.append("如果当前 ChatGPT 环境支持生成文件，请把每篇深度精读文章分别生成 Word 文档，并把所有 Word 打包成一个 zip 文件返回给我下载。")
+
+    return "\n".join(lines)
+
+
+def build_markdown_package(
+    df: pd.DataFrame,
+    task_code: str,
+    candidate_top_n: int = 10,
+    deep_n: int = 3,
+    deep_read_count: int = None,
+) -> str:
+    """
+    兼容旧调用名，避免 app.py 或手动调用出现函数名不一致。
+    """
+    return build_chatgpt_markdown_package(
+        df,
+        task_code=task_code,
+        candidate_top_n=candidate_top_n,
+        deep_n=deep_n,
+        deep_read_count=deep_read_count,
+    )
